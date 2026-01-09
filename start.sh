@@ -1,3 +1,4 @@
 #!/bin/bash
 cd backend
-exec uvicorn main:app --host 0.0.0.0 --port "$PORT"
+export PYTHONPATH="${PYTHONPATH}:/opt/render/project/src/backend"
+exec python -m uvicorn main:app --host 0.0.0.0 --port "$PORT"
