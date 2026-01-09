@@ -13,6 +13,7 @@ class ProcessRequest(BaseModel):
     transcript: str
     lecture_title: Optional[str] = "Untitled Lecture"
     course_title: Optional[str] = None
+    force_refresh: Optional[bool] = False
 
 class ProcessResponse(BaseModel):
     summary: str
@@ -28,7 +29,8 @@ async def process_transcript(request: ProcessRequest):
         # call AI service
         result = await ai_service.process_lecture(
             transcript=request.transcript,
-            lecture_title=request.lecture_title
+            lecture_title=request.lecture_title,
+            force_refresh=request.force_refresh
         )
         return result
     except Exception as e:

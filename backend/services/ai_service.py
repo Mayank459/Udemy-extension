@@ -2,6 +2,8 @@ import os
 from typing import Dict, List, Any
 import httpx
 import re
+import hashlib
+from functools import lru_cache
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -25,9 +27,52 @@ class AIService:
         self.hf_model = "mistralai/Mistral-7B-Instruct-v0.2"
         self.hf_api_url = f"https://api-inference.huggingface.co/models/{self.hf_model}"
 
-    async def process_lecture(self, transcript: str, lecture_title: str) -> Dict[str, Any]:
+    def _generate_cache_key(self, transcript: str) -> str:
+        """Generate MD5 hash of transcript for cache key"""
+        return hashlib.md5(transcript.encode()).hexdigest()
+    
+    @lru_cache(maxsize=100)
+    def _cached_process(self, cache_key: str, transcript: str, lecture_title: str) -> str:
+        """Cached version of processing - returns JSON string"""
+        import json
+        import asyncio
+        
+        # Run async code in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(self._process_lecture_internal(transcript, lecture_title))
+            return json.dumps(result)
+        finally:
+            loop.close()
+    
+    async def process_lecture(self, transcript: str, lecture_title: str, force_refresh: bool = False) -> Dict[str, Any]:
         """
-        Orchestrates the AI processing pipeline.
+        Orchestrates the AI processing pipeline with caching.
+        """
+        import json
+        
+        cache_key = self._generate_cache_key(transcript)
+        
+        # Clear cache if force refresh
+        if force_refresh:
+            self._cached_process.cache_clear()
+            print(f"[Cache] Force refresh - cache cleared")
+        
+        # Try to get from cache
+        try:
+            cached_json = self._cached_process(cache_key, transcript, lecture_title)
+            result = json.loads(cached_json)
+            print(f"[Cache] {'Miss' if force_refresh else 'Hit'} - cache_key: {cache_key[:8]}...")
+            return result
+        except Exception as e:
+            print(f"[Cache] Error: {e}")
+            # Fallback to direct processing
+            return await self._process_lecture_internal(transcript, lecture_title)
+    
+    async def _process_lecture_internal(self, transcript: str, lecture_title: str) -> Dict[str, Any]:
+        """
+        Internal processing logic (called by cached wrapper).
         """
         
         # 1. Summarization

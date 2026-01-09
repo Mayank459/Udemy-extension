@@ -196,7 +196,7 @@ function showAIPanel() {
     }
 }
 
-async function triggerGeneration() {
+async function triggerGeneration(forceRefresh = false) {
     const loadingDiv = document.getElementById('ai-loading');
     const resultDiv = document.getElementById('ai-result');
     const placeholderDiv = document.getElementById('ai-placeholder');
@@ -213,9 +213,18 @@ async function triggerGeneration() {
             throw new Error('No transcript available. This is a demo - real caption extraction needs to be implemented.');
         }
 
+        // Check cache first (unless force refresh)
+        if (!forceRefresh && window.UdemyAICache) {
+            const cached = window.UdemyAICache.getCachedSummary(window.location.href, transcript);
+            if (cached) {
+                renderResult(cached, true); // true = from cache
+                return;
+            }
+        }
+
         // Get backend URL from settings
         const settings = await chrome.storage.local.get(['backendUrl']);
-        const backendUrl = settings.backendUrl || 'http://localhost:8000';
+        const backendUrl = settings.backendUrl || 'https://udemy-extension.onrender.com';
 
         console.log('[Udemy AI] Calling backend:', backendUrl);
 
@@ -224,7 +233,8 @@ async function triggerGeneration() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 transcript: transcript,
-                lecture_title: document.title
+                lecture_title: document.title,
+                force_refresh: forceRefresh
             })
         });
 
@@ -233,7 +243,13 @@ async function triggerGeneration() {
         }
 
         const data = await response.json();
-        renderResult(data);
+
+        // Store in cache
+        if (window.UdemyAICache) {
+            window.UdemyAICache.setCachedSummary(window.location.href, transcript, data);
+        }
+
+        renderResult(data, false); // false = fresh from API
 
     } catch (error) {
         console.error('[Udemy AI] Generation failed:', error);
@@ -241,39 +257,8 @@ async function triggerGeneration() {
             <div style="background: #fff4e5; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; color: #856404;">
                 <strong>⚠️ Error:</strong> ${error.message}
                 <br><br>
-                <small>Make sure the backend is running on http://localhost:8000</small>
-            
-        
-        <!-- Export Buttons -->
-        <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">
-            <button id="export-markdown-btn" style="
-                background: #5624d0;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 4px;
-                font-size: 15px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#3b1a8c'" onmouseout="this.style.background='#5624d0'">
-                📄 Export as Markdown
-            </button>
-            <button id="export-pdf-btn" style="
-                background: #a435f0;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 4px;
-                font-size: 15px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#8710d8'" onmouseout="this.style.background='#a435f0'">
-                📑 Export as PDF
-            </button>
-        </div>
-    </div>
+                <small>Make sure the backend is running at https://udemy-extension.onrender.com</small>
+            </div>
         `;
         resultDiv.style.display = 'block';
     } finally {
@@ -323,10 +308,19 @@ That covers the basics of functions and lists in Python. In the next lecture, we
     }
 }
 
-function renderResult(data) {
+function renderResult(data, fromCache = false) {
     const resultDiv = document.getElementById('ai-result');
 
+    const cacheIndicator = fromCache ? `
+        <div style="background: #e8f5e9; border: 1px solid #4caf50; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">⚡</span>
+            <span style="color: #2e7d32; font-weight: 600;">Loaded from cache (instant!)</span>
+        </div>
+    ` : '';
+
     resultDiv.innerHTML = `
+        ${cacheIndicator}
+        
         <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px;">
             <h3 style="margin-top: 0; color: #1c1d1f; font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem;">📝 Summary</h3>
             <div style="line-height: 1.8; color: #2d2f31; white-space: pre-wrap; font-size: 16px;">${data.summary}</div>
@@ -355,8 +349,21 @@ function renderResult(data) {
             </ul>
         
         
-        <!-- Export Buttons -->
-        <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center;">
+        <!-- Action Buttons -->
+        <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <button id="regenerate-btn" style="
+                background: #ff9800;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 4px;
+                font-size: 15px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#f57c00'" onmouseout="this.style.background='#ff9800'">
+                🔄 Re-generate
+            </button>
             <button id="export-markdown-btn" style="
                 background: #5624d0;
                 color: white;
@@ -388,6 +395,29 @@ function renderResult(data) {
     `;
 
     resultDiv.style.display = 'block';
+
+    // Store data globally for export functions
+    window.currentSummaryData = data;
+
+    // Bind export button events
+    setTimeout(() => {
+        const regenerateBtn = document.getElementById('regenerate-btn');
+        const markdownBtn = document.getElementById('export-markdown-btn');
+        const pdfBtn = document.getElementById('export-pdf-btn');
+
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', () => {
+                console.log('[Udemy AI] Re-generating summary (bypassing cache)...');
+                triggerGeneration(true); // true = force refresh
+            });
+        }
+        if (markdownBtn) {
+            markdownBtn.addEventListener('click', () => exportAsMarkdown(window.currentSummaryData));
+        }
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', () => exportAsPDF(window.currentSummaryData));
+        }
+    }, 100);
 }
 
 function escapeHtml(text) {
@@ -416,9 +446,9 @@ ${data.summary}
 ${data.code_blocks.length > 0 ? data.code_blocks.map((code, index) => `
 ### Code Snippet ${index + 1}
 
-\\`\\`\\`
+\`\`\`
 ${code}
-\\`\\`\\`
+\`\`\`
 `).join('\n') : 'No code snippets found in this lecture.'}
 
 ## 🎯 Key Concepts
@@ -438,7 +468,7 @@ ${data.key_concepts.map(concept => `- ${concept}`).join('\n')}
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     console.log('[Udemy AI] Exported as Markdown');
 }
 
@@ -447,85 +477,85 @@ async function exportAsPDF(data) {
         console.log('[Udemy AI] Loading jsPDF...');
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     }
-    
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
+
     let yPosition = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
     const maxWidth = pageWidth - (margin * 2);
-    
+
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.text('Udemy AI Smart Overview', margin, yPosition);
     yPosition += 15;
-    
+
     doc.setFontSize(16);
     doc.text('Summary', margin, yPosition);
     yPosition += 10;
-    
+
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
     const summaryLines = doc.splitTextToSize(data.summary, maxWidth);
     doc.text(summaryLines, margin, yPosition);
     yPosition += (summaryLines.length * 7) + 10;
-    
+
     if (yPosition > 250) {
         doc.addPage();
         yPosition = 20;
     }
-    
+
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.text('Code Snippets', margin, yPosition);
     yPosition += 10;
-    
+
     doc.setFontSize(10);
     doc.setFont('courier', 'normal');
-    
+
     if (data.code_blocks.length > 0) {
         data.code_blocks.forEach((code, index) => {
             if (yPosition > 250) {
                 doc.addPage();
                 yPosition = 20;
             }
-            
+
             doc.setFont(undefined, 'bold');
-            doc.text(`Code Snippet ${index + 1}:`, margin, yPosition);
+            doc.text(`Code Snippet ${index + 1}: `, margin, yPosition);
             yPosition += 7;
-            
+
             doc.setFont('courier', 'normal');
             const codeLines = doc.splitTextToSize(code, maxWidth);
             doc.text(codeLines, margin, yPosition);
             yPosition += (codeLines.length * 5) + 10;
         });
     }
-    
+
     if (yPosition > 220) {
         doc.addPage();
         yPosition = 20;
     }
-    
+
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.text('Key Concepts', margin, yPosition);
     yPosition += 10;
-    
+
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
-    
+
     data.key_concepts.forEach(concept => {
         if (yPosition > 270) {
             doc.addPage();
             yPosition = 20;
         }
-        
-        const conceptLines = doc.splitTextToSize(`• ${concept}`, maxWidth - 5);
+
+        const conceptLines = doc.splitTextToSize(`• ${concept} `, maxWidth - 5);
         doc.text(conceptLines, margin + 5, yPosition);
         yPosition += (conceptLines.length * 7) + 3;
     });
-    
+
     doc.save(`udemy-summary-${Date.now()}.pdf`);
     console.log('[Udemy AI] Exported as PDF');
 }

@@ -27,6 +27,7 @@
         "*://*.udemy.com/lecture/*"
       ],
       "js": [
+        "utils/cache-utils.js",
         "content/inject-tab.js",
         "content/caption-extractor.js"
       ],
