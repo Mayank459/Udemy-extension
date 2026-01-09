@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Udemy AI Smart Overview",
+  "version": "1.0.0",
+  "description": "Adds an AI-powered Smart Overview tab to Udemy courses with summaries and code extraction.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "*://*.udemy.com/*",
+    "http://localhost:8000/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Udemy AI Overview Settings"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.udemy.com/course/*",
+        "*://*.udemy.com/lecture/*"
+      ],
+      "js": [
+        "content/inject-tab.js",
+        "content/caption-extractor.js"
+      ],
+      "css": [
+        "styles/inject.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "styles/inject.css",
+        "assets/*"
+      ],
+      "matches": [
+        "*://*.udemy.com/*"
+      ]
+    }
+  ]
+}

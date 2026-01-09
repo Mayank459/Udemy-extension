@@ -1,0 +1,59 @@
+/* Tab Button Styles */
+.ai-overview-tab {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 2px solid transparent;
+}
+
+.ai-overview-tab[aria-selected="true"] {
+    border-bottom-color: #a435f0;
+    color: #1c1d1f;
+}
+
+/* Panel Styles */
+#ai-overview-panel {
+    background: white;
+    padding: 24px;
+    border: 1px solid #d1d7dc;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-family: 'Udemy Sans', sans-serif;
+}
+
+.ai-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e8eaed;
+    padding-bottom: 16px;
+}
+
+.ai-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #2d2f31;
+}
+
+.ai-content pre {
+    background: #f7f9fa;
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    border: 1px solid #d1d7dc;
+}
+
+.ai-loading {
+    text-align: center;
+    padding: 40px;
+    color: #6a6f73;
+    font-style: italic;
+}
+
+.error {
+    color: #721c24;
+    background: #f8d7da;
+    padding: 10px;
+    border-radius: 4px;
+}
