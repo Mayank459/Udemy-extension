@@ -53,13 +53,13 @@ That's it for this lecture. Practice these concepts and we'll move on to more ad
  */
 async function extractTranscriptFromUdemy() {
     console.log('[Udemy AI] Attempting to extract transcript from Udemy...');
-    
+
     // Try to open transcript panel if it's closed
     await ensureTranscriptPanelOpen();
-    
+
     // Wait for transcript to load
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     const transcript = extractTranscriptText();
     return transcript;
 }
@@ -67,7 +67,7 @@ async function extractTranscriptFromUdemy() {
 // Helper function to ensure transcript panel is open
 async function ensureTranscriptPanelOpen() {
     console.log('[Udemy AI] Checking if transcript panel is open...');
-    
+
     // Look for transcript button/toggle
     const transcriptButtons = [
         'button[data-purpose="transcript-toggle"]',
@@ -75,7 +75,7 @@ async function ensureTranscriptPanelOpen() {
         'button[aria-label*="transcript"]',
         '[class*="transcript-toggle"]'
     ];
-    
+
     for (const selector of transcriptButtons) {
         const button = document.querySelector(selector);
         if (button && button.getAttribute('aria-expanded') === 'false') {
@@ -93,13 +93,37 @@ async function ensureTranscriptPanelOpen() {
 function extractTranscriptText() {
     console.log('[Udemy AI] Searching for transcript in DOM...');
 
-    // Strategy 1: Look for transcript text in the sidebar/panel
-    // Based on the screenshot, transcript appears in a panel on the right
+    // Strategy 1: Look for the transcript sidebar (has Autoscroll checkbox)
+    // Based on screenshot, transcript is in a sidebar panel on the right
+    const transcriptSidebar = document.querySelector('[data-purpose="sidebar"]');
+    if (transcriptSidebar) {
+        console.log('[Udemy AI] Found sidebar, extracting text...');
+
+        // Look for all paragraph/span elements in the sidebar
+        const textElements = transcriptSidebar.querySelectorAll('p, span[class*="cue"], div[class*="cue"]');
+        if (textElements.length > 0) {
+            const text = Array.from(textElements)
+                .map(el => el.textContent.trim())
+                .filter(t => t.length > 0 && !t.includes('Autoscroll') && !t.startsWith('Take a'))
+                .join(' ');
+
+            if (text.length > 50) {
+                console.log(`[Udemy AI] ✅ Extracted ${text.length} characters from sidebar`);
+                return text;
+            }
+        }
+    }
+
+    // Strategy 2: Look for specific Udemy transcript cue selectors
     const transcriptSelectors = [
+        // Udemy specific transcript cues
+        '[data-purpose="cue-text"]',
+        '[class*="transcript--cue-text"]',
+        '[class*="cue-text"]',
+        'span[class*="transcript"]',
         // Try specific transcript cue selectors
         '[data-purpose="transcript-cue-text"]',
         '[class*="transcript-cue"]',
-        '[class*="cue-text"]',
         // Try broader selectors
         '.transcript p',
         '[role="region"][aria-label*="Transcript"] p',
@@ -235,3 +259,7 @@ window.addEventListener('message', (event) => {
             });
     }
 });
+
+// Expose function globally for inject-tab.js
+window.extractTranscriptFromUdemy = extractTranscriptFromUdemy;
+console.log('[Udemy AI] extractTranscriptFromUdemy exposed globally');

@@ -338,6 +338,56 @@ function showAIPanel() {
     } else {
         console.error('[Udemy AI] Could not find AI tab to update');
     }
+
+    // Add click handlers to all other tabs to restore them when clicked
+    setupOtherTabClickHandlers();
+}
+
+// Setup click handlers for native Udemy tabs
+function setupOtherTabClickHandlers() {
+    const allTabs = document.querySelectorAll('[role="tab"]:not([data-purpose="ai-overview-tab"])');
+
+    allTabs.forEach(tab => {
+        // Remove existing handler if any
+        if (tab._aiClickHandler) {
+            tab.removeEventListener('click', tab._aiClickHandler);
+        }
+
+        // Create and store new handler
+        tab._aiClickHandler = function () {
+            console.log('[Udemy AI] Native tab clicked, hiding AI panel');
+
+            // Hide AI panel
+            const aiPanel = document.getElementById('ai-overview-panel');
+            if (aiPanel) {
+                aiPanel.style.display = 'none';
+            }
+
+            // Find and show the corresponding panel for this tab
+            const ariaControls = this.getAttribute('aria-controls');
+            if (ariaControls) {
+                const targetPanel = document.getElementById(ariaControls);
+                if (targetPanel) {
+                    targetPanel.style.display = 'block';
+                    console.log('[Udemy AI] Showing panel:', ariaControls);
+                }
+            }
+
+            // Update tab states
+            const allTabs = document.querySelectorAll('[role="tab"]');
+            allTabs.forEach(t => {
+                t.setAttribute('aria-selected', 'false');
+                t.classList.remove('ud-nav-button-active');
+            });
+
+            this.setAttribute('aria-selected', 'true');
+            this.classList.add('ud-nav-button-active');
+        };
+
+        tab.addEventListener('click', tab._aiClickHandler);
+    });
+
+    console.log('[Udemy AI] Setup click handlers for', allTabs.length, 'native tabs');
 }
 
 // Start generation in background (silently)
