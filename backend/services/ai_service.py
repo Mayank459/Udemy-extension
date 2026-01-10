@@ -3,9 +3,10 @@ from typing import Dict, List, Any
 import httpx
 import re
 import hashlib
+from pathlib import Path
 
 # Import API keys from config module (avoids os.environ reload issues)
-from backend import config
+from .. import config
 
 class AIService:
     def __init__(self):
