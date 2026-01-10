@@ -3,72 +3,58 @@ from typing import Dict, List, Any
 import httpx
 import re
 import hashlib
-from functools import lru_cache
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Import API keys from config module (avoids os.environ reload issues)
+from backend import config
 
 class AIService:
     def __init__(self):
-        # Support multiple AI providers
-        self.hf_token = os.getenv("HUGGINGFACE_API_KEY")  # Free tier available
-        self.groq_key = os.getenv("GROQ_API_KEY")  # Fast & free tier
-        self.openai_key = os.getenv("OPENAI_API_KEY")  # Paid option
+        # Support multiple AI providers - use config module instead of os.environ
+        self.hf_token = config.HUGGINGFACE_API_KEY
+        self.groq_key = config.GROQ_API_KEY
+        self.openai_key = config.OPENAI_API_KEY
         
-        # Default to Hugging Face (free)
+        # Debug: Print if API key is loaded
+        print(f"[AI Service] HF API Key loaded: {bool(self.hf_token)}")
+        if self.hf_token:
+            print(f"[AI Service] Key preview: {self.hf_token[:10]}...")
+        
+        # Use Hugging Face as primary provider
         self.provider = "huggingface"
-        if self.groq_key:
-            self.provider = "groq"
-        elif self.openai_key:
-            self.provider = "openai"
         
-        # Hugging Face model endpoint
-        self.hf_model = "mistralai/Mistral-7B-Instruct-v0.2"
+        # Hugging Face FLAN-T5 model endpoint (reliable, always available)
+        self.hf_model = "google/flan-t5-xxl"
         self.hf_api_url = f"https://api-inference.huggingface.co/models/{self.hf_model}"
+        
+        # Simple in-memory cache (dict instead of lru_cache to avoid event loop issues)
+        self._cache = {}
 
     def _generate_cache_key(self, transcript: str) -> str:
         """Generate MD5 hash of transcript for cache key"""
         return hashlib.md5(transcript.encode()).hexdigest()
     
-    @lru_cache(maxsize=100)
-    def _cached_process(self, cache_key: str, transcript: str, lecture_title: str) -> str:
-        """Cached version of processing - returns JSON string"""
-        import json
-        import asyncio
-        
-        # Run async code in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(self._process_lecture_internal(transcript, lecture_title))
-            return json.dumps(result)
-        finally:
-            loop.close()
-    
     async def process_lecture(self, transcript: str, lecture_title: str, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Orchestrates the AI processing pipeline with caching.
         """
-        import json
-        
         cache_key = self._generate_cache_key(transcript)
         
         # Clear cache if force refresh
         if force_refresh:
-            self._cached_process.cache_clear()
+            self._cache.clear()
             print(f"[Cache] Force refresh - cache cleared")
         
-        # Try to get from cache
-        try:
-            cached_json = self._cached_process(cache_key, transcript, lecture_title)
-            result = json.loads(cached_json)
-            print(f"[Cache] {'Miss' if force_refresh else 'Hit'} - cache_key: {cache_key[:8]}...")
-            return result
-        except Exception as e:
-            print(f"[Cache] Error: {e}")
-            # Fallback to direct processing
-            return await self._process_lecture_internal(transcript, lecture_title)
+        # Check cache
+        if cache_key in self._cache and not force_refresh:
+            print(f"[Cache] Hit - cache_key: {cache_key[:8]}...")
+            return self._cache[cache_key]
+        
+        # Process and cache
+        print(f"[Cache] Miss - processing...")
+        result = await self._process_lecture_internal(transcript, lecture_title)
+        self._cache[cache_key] = result
+        
+        return result
     
     async def _process_lecture_internal(self, transcript: str, lecture_title: str) -> Dict[str, Any]:
         """
@@ -97,20 +83,77 @@ class AIService:
         max_chars = 8000
         truncated = transcript[:max_chars] if len(transcript) > max_chars else transcript
         
-        prompt = f"""Analyze this lecture transcript and create a detailed summary.
+        prompt = f"""Create a clear, structured summary of this Udemy lecture transcript, formatted like study notes / course overview.
 
 Lecture Title: {title}
 
 Transcript:
 {truncated}
 
-Provide a comprehensive summary covering:
-1. Main topics and concepts
-2. Key takeaways
-3. Important definitions or formulas
-4. Practical applications
+IMPORTANT: Format the summary EXACTLY like this example structure using markdown:
 
-Summary:"""
+---
+
+# 📘 [Topic Name] – Lecture Summary
+
+## 🔹 Topic Overview
+
+[Brief overview paragraph explaining what this lecture covers and its purpose]
+
+---
+
+## 🔹 [Main Section 1]
+
+* Point 1 with **bold emphasis** on key terms
+* Point 2 with important details
+* Point 3 with specifics
+
+### [Subsection if needed]
+
+* Sub-point 1
+* Sub-point 2
+
+---
+
+## 🔹 [Main Section 2]
+
+[Content organized by topic with bullets, numbered lists, or paragraphs]
+
+### 1. [Subtopic Name]
+
+* Explanation with **bold** for emphasis
+* Use *italic* for technical terms or examples
+
+### 2. [Next Subtopic]
+
+* Detail 1
+* Detail 2
+
+---
+
+[Repeat for each major topic covered in the lecture]
+
+---
+
+## 🎯 Key Takeaways
+
+* Main takeaway 1 with **bold emphasis**
+* Main takeaway 2
+* Main takeaway 3
+
+---
+
+REQUIREMENTS:
+- Use emojis (📘, 🔹, 🎯, 💡, etc.) to make sections visually appealing
+- Use **bold** for important terms and concepts
+- Use *italic* for examples or technical terms
+- Use horizontal rules (---) to separate major sections
+- Organize with clear hierarchy: # for title, ## for sections, ### for subsections
+- Include practical takeaways at the end
+- Be comprehensive but concise
+- Focus on educational value
+
+Generate the summary now:"""
 
         if self.provider == "huggingface":
             return await self._call_huggingface(prompt)

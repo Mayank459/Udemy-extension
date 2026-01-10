@@ -4,52 +4,64 @@ console.log('[Udemy AI] Inject script loaded');
 function init() {
     console.log('[Udemy AI] Initializing...');
 
-    // Try to find the tab container
-    // Udemy uses different selectors, so we try multiple approaches
     const tryInject = () => {
-        if (document.querySelector('.ai-overview-tab')) {
+        if (document.querySelector('[data-purpose="ai-overview-tab"]')) {
             console.log('[Udemy AI] Already injected');
             return true;
         }
 
-        // Look for the tab navigation bar (Overview, Q&A, Notes, etc.)
-        const tabSelectors = [
-            'nav[role="tablist"]',
-            'div[role="tablist"]',
-            '.ud-component--course-taking--curriculum-item-view--tabs',
-            'button[data-purpose="overview-tab"]'
-        ];
+        console.log('[Udemy AI] Searching for tab container...');
 
-        let tabContainer = null;
-        for (const selector of tabSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                // If we found a button, get its parent container
-                if (element.tagName === 'BUTTON') {
-                    tabContainer = element.parentElement;
-                } else {
-                    tabContainer = element;
+        // Find ALL scroll ports on the page
+        const allScrollPorts = document.querySelectorAll('[data-purpose="scroll-port"]');
+        console.log(`[Udemy AI] Found ${allScrollPorts.length} scroll ports`);
+
+        // Find the one that contains Overview/Q&A tabs (below video), not sidebar tabs
+        for (const scrollPort of allScrollPorts) {
+            const buttons = scrollPort.querySelectorAll('button[role="tab"]');
+
+            // Check if this scroll port has the Overview tab (main content tabs)
+            let hasOverviewTab = false;
+            for (const button of buttons) {
+                const text = button.textContent || '';
+                if (text.includes('Overview') || text.includes('Q&A')) {
+                    hasOverviewTab = true;
+                    break;
                 }
-                console.log('[Udemy AI] Found tab container:', selector);
-                break;
+            }
+
+            if (hasOverviewTab) {
+                console.log('[Udemy AI] ✓ Found correct scroll port with Overview/Q&A tabs');
+                console.log('[Udemy AI] Scroll port:', scrollPort);
+                console.log('[Udemy AI] Number of existing tabs:', scrollPort.querySelectorAll('[data-index]').length);
+                injectTab(scrollPort);
+                return true;
             }
         }
 
-        if (tabContainer) {
-            injectTab(tabContainer);
-            return true;
-        }
-
+        console.log('[Udemy AI] No correct scroll port found yet');
         return false;
     };
 
     // Try immediately
-    if (tryInject()) return;
+    if (tryInject()) {
+        // Auto-generate summary in background after successful injection
+        setTimeout(() => {
+            console.log('[Udemy AI] Auto-starting background generation...');
+            startBackgroundGeneration();
+        }, 2000); // Wait 2 seconds for page to fully load
+        return;
+    }
 
-    // If not found, observe for changes
+    // Set up MutationObserver to watch for DOM changes
     const observer = new MutationObserver(() => {
         if (tryInject()) {
             observer.disconnect();
+            // Auto-generate summary in background
+            setTimeout(() => {
+                console.log('[Udemy AI] Auto-starting background generation...');
+                startBackgroundGeneration();
+            }, 2000);
         }
     });
 
@@ -58,51 +70,156 @@ function init() {
         subtree: true
     });
 
-    // Also try after a delay
-    setTimeout(tryInject, 2000);
+    // Also try after delays (Udemy loads tabs asynchronously)
+    setTimeout(() => {
+        if (tryInject()) {
+            observer.disconnect();
+            setTimeout(() => startBackgroundGeneration(), 2000);
+        }
+    }, 1000);
+
+    setTimeout(() => {
+        if (tryInject()) {
+            observer.disconnect();
+            setTimeout(() => startBackgroundGeneration(), 2000);
+        }
+    }, 3000);
+
+    setTimeout(() => {
+        if (tryInject()) {
+            observer.disconnect();
+            setTimeout(() => startBackgroundGeneration(), 2000);
+        }
+    }, 5000);
 }
 
-function injectTab(tabContainer) {
+function injectTab(scrollPort) {
     console.log('[Udemy AI] Injecting AI Overview tab...');
+    console.log('[Udemy AI] Scroll port:', scrollPort);
 
-    // Create the tab button
-    const aiTab = document.createElement('button');
-    aiTab.className = 'ai-overview-tab ud-btn ud-btn-large ud-btn-ghost ud-heading-sm';
-    aiTab.setAttribute('role', 'tab');
-    aiTab.setAttribute('aria-selected', 'false');
-    aiTab.innerHTML = '<span>✨ AI Overview</span>';
+    // Count existing tabs to get the next index
+    const existingTabs = scrollPort.querySelectorAll('[data-index]');
+    const nextIndex = existingTabs.length;
 
-    // Style to match Udemy tabs
-    aiTab.style.cssText = `
-        padding: 0 1rem;
-        margin: 0 0.5rem;
-        cursor: pointer;
-        border: none;
-        background: transparent;
-        color: inherit;
-        font-weight: 400;
-    `;
+    console.log('[Udemy AI] Existing tabs:', existingTabs.length);
+    console.log('[Udemy AI] Next index:', nextIndex);
+
+    // Create the scroll item wrapper (matches Udemy structure exactly)
+    const scrollItem = document.createElement('div');
+    scrollItem.setAttribute('data-index', nextIndex);
+    scrollItem.className = 'carousel-module--scroll-item--QZoY7';
+
+    // Create nav button container
+    const navButtonContainer = document.createElement('div');
+    navButtonContainer.className = 'ud-nav-button-container tabs-module--nav-button-container--UQiPm';
+
+    // Create h2 wrapper
+    const h2 = document.createElement('h2');
+
+    // Create the actual button
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = `tabs--7-tab-${nextIndex}`;
+    button.setAttribute('aria-selected', 'false');
+    button.setAttribute('role', 'tab');
+    button.className = 'ud-btn ud-btn-large ud-btn-ghost ud-btn-text-md ud-nav-button tabs-module--nav-button--DtB8V';
+    button.setAttribute('tabindex', '-1');
+    button.style.borderBottom = 'none';
+    button.setAttribute('data-purpose', 'ai-overview-tab');
+
+    // Create button label
+    const span = document.createElement('span');
+    span.className = 'ud-btn-label';
+    span.textContent = '✨ AI Overview';
+
+    // Assemble the structure
+    button.appendChild(span);
+    h2.appendChild(button);
+    navButtonContainer.appendChild(h2);
+    scrollItem.appendChild(navButtonContainer);
 
     // Add click handler
-    aiTab.addEventListener('click', () => showAIPanel());
+    button.addEventListener('click', async () => {
+        console.log('[Udemy AI] AI Overview tab clicked!');
 
-    // Append to tab container
-    tabContainer.appendChild(aiTab);
+        // Create panel on first click if it doesn't exist
+        if (!document.getElementById('ai-overview-panel')) {
+            console.log('[Udemy AI] Panel does not exist, creating it now...');
+            createAIPanel();
+        }
 
-    // Create the AI panel
-    createAIPanel();
+        showAIPanel();
+
+        // Auto-generate summary if not already generated
+        const resultDiv = document.getElementById('ai-result');
+        if (resultDiv && resultDiv.style.display === 'none') {
+            console.log('[Udemy AI] Auto-generating summary...');
+            // Wait a bit for panel to be visible
+            setTimeout(() => {
+                triggerGeneration();
+            }, 100);
+        }
+    });
+
+    // Append to scroll port
+    scrollPort.appendChild(scrollItem);
 
     console.log('[Udemy AI] Tab injected successfully!');
+    console.log('[Udemy AI] Tab element:', button);
+    console.log('[Udemy AI] Tab visible?', button.offsetWidth > 0 && button.offsetHeight > 0);
 }
 
 function createAIPanel() {
-    // Find the content area where tab content is displayed
-    const contentArea = document.querySelector('.ud-component--course-taking--curriculum-item-view--content')
-        || document.querySelector('[data-purpose="curriculum-item-view-content"]')
-        || document.body;
+    console.log('[Udemy AI] Creating AI panel...');
+
+    // Find the main content area below the video
+    // Look for tab panels with IDs like "tabs--X-content-Y" that are NOT in the sidebar
+
+    const allTabPanels = document.querySelectorAll('[role="tabpanel"]');
+    let mainContentPanel = null;
+
+    console.log(`[Udemy AI] Found ${allTabPanels.length} total tab panels`);
+
+    for (const panel of allTabPanels) {
+        // Skip panels that are inside the actual sidebar element
+        const inSidebar = panel.closest('[data-purpose="sidebar"]');
+        if (inSidebar) {
+            console.log('[Udemy AI] Skipping sidebar panel:', panel.id);
+            continue;
+        }
+
+        // Skip cookie consent / privacy panels (OneTrust)
+        const isCookiePanel = panel.id?.includes('ot-') ||
+            panel.className?.includes('ot-') ||
+            panel.closest('[id*="onetrust"]') ||
+            panel.closest('[class*="onetrust"]');
+        if (isCookiePanel) {
+            console.log('[Udemy AI] Skipping cookie/privacy panel:', panel.id);
+            continue;
+        }
+
+        // Look for panels with IDs like "tabs--7-content-0" (main content tabs)
+        if (panel.id && panel.id.match(/^tabs--\d+-content-\d+$/)) {
+            console.log('[Udemy AI] Found main content panel:', panel.id);
+            mainContentPanel = panel;
+            break;
+        }
+    }
+
+    if (!mainContentPanel) {
+        console.error('[Udemy AI] Could not find main content panel');
+        console.log('[Udemy AI] All panels:', allTabPanels);
+        return;
+    }
+
+    // Get the parent container that holds all tab panels
+    const contentArea = mainContentPanel.parentElement;
+    console.log('[Udemy AI] Found main content panel:', mainContentPanel);
+    console.log('[Udemy AI] Found content area (parent):', contentArea);
 
     const aiPanel = document.createElement('div');
     aiPanel.id = 'ai-overview-panel';
+    aiPanel.setAttribute('role', 'tabpanel');
     aiPanel.style.cssText = `
         display: none;
         padding: 2rem;
@@ -110,6 +227,10 @@ function createAIPanel() {
         border-radius: 8px;
         margin: 1rem 0;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        position: relative;
+        z-index: 1;
+        min-height: 400px;
+        border: 3px solid #a435f0;
     `;
 
     aiPanel.innerHTML = `
@@ -139,7 +260,7 @@ function createAIPanel() {
                     Click "Generate Summary" to analyze this lecture with AI 🤖
                 </p>
                 <p style="margin-top: 0.5rem; font-size: 0.9rem;">
-                    Powered by Groq AI (llama-3.3-70b)
+                    Powered by Hugging Face (FLAN-T5-XXL)
                 </p>
             </div>
             
@@ -156,43 +277,86 @@ function createAIPanel() {
         </div>
     `;
 
-    // Insert into page
-    if (contentArea.firstChild) {
-        contentArea.insertBefore(aiPanel, contentArea.firstChild);
-    } else {
-        contentArea.appendChild(aiPanel);
-    }
+    // Append to the tab content area (sibling of other tab panels)
+    console.log('[Udemy AI] Appending panel to:', contentArea);
+    contentArea.appendChild(aiPanel);
+    console.log('[Udemy AI] Panel appended. Parent element:', aiPanel.parentElement);
+    console.log('[Udemy AI] Panel position in DOM:', aiPanel.getBoundingClientRect());
 
     // Bind generate button
     document.getElementById('ai-generate-btn').addEventListener('click', triggerGeneration);
 }
 
 function showAIPanel() {
-    // Hide all other tab content
-    const contentDivs = document.querySelectorAll('[data-purpose="curriculum-item-view-content"] > div');
-    contentDivs.forEach(div => {
-        if (div.id !== 'ai-overview-panel') {
-            div.style.display = 'none';
+    console.log('[Udemy AI] showAIPanel called');
+
+    // Find the AI panel
+    const aiPanel = document.getElementById('ai-overview-panel');
+    if (!aiPanel) {
+        console.error('[Udemy AI] AI panel not found!');
+        return;
+    }
+
+    console.log('[Udemy AI] AI panel found:', aiPanel);
+    console.log('[Udemy AI] AI panel current display:', aiPanel.style.display);
+
+    // Hide all other tab panels (only main content ones, not sidebar)
+    const allPanels = document.querySelectorAll('[role="tabpanel"][id*="tabs--"]');
+    allPanels.forEach(panel => {
+        const inSidebar = panel.closest('[data-purpose="sidebar"]');
+        if (!inSidebar && panel.id !== 'ai-overview-panel') {
+            panel.style.display = 'none';
+            console.log('[Udemy AI] Hiding panel:', panel.id);
         }
     });
 
     // Show AI panel
-    const aiPanel = document.getElementById('ai-overview-panel');
-    if (aiPanel) {
-        aiPanel.style.display = 'block';
-    }
+    aiPanel.style.display = 'block';
+    console.log('[Udemy AI] AI panel display set to block');
+
+    // Scroll the panel into view
+    aiPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Flash the background to make it obvious
+    aiPanel.style.background = '#fff3cd';
+    setTimeout(() => {
+        aiPanel.style.background = 'white';
+    }, 1000);
 
     // Update tab states
     const allTabs = document.querySelectorAll('[role="tab"]');
     allTabs.forEach(tab => {
         tab.setAttribute('aria-selected', 'false');
-        tab.style.borderBottom = 'none';
+        tab.classList.remove('ud-nav-button-active');
     });
 
-    const aiTab = document.querySelector('.ai-overview-tab');
+    const aiTab = document.querySelector('[data-purpose="ai-overview-tab"]');
     if (aiTab) {
         aiTab.setAttribute('aria-selected', 'true');
-        aiTab.style.borderBottom = '2px solid #a435f0';
+        aiTab.classList.add('ud-nav-button-active');
+        console.log('[Udemy AI] AI tab activated');
+    } else {
+        console.error('[Udemy AI] Could not find AI tab to update');
+    }
+}
+
+// Start generation in background (silently)
+function startBackgroundGeneration() {
+    console.log('[Udemy AI] Starting background generation...');
+
+    // Create panel if it doesn't exist (but don't show it)
+    if (!document.getElementById('ai-overview-panel')) {
+        createAIPanel();
+    }
+
+    // Check if summary already exists
+    const resultDiv = document.getElementById('ai-result');
+    if (resultDiv && resultDiv.style.display === 'none') {
+        // Trigger generation silently
+        console.log('[Udemy AI] Background: Generating summary...');
+        triggerGeneration();
+    } else {
+        console.log('[Udemy AI] Background: Summary already exists');
     }
 }
 
@@ -222,20 +386,33 @@ async function triggerGeneration(forceRefresh = false) {
             }
         }
 
-        // Get backend URL from settings
-        const settings = await chrome.storage.local.get(['backendUrl']);
-        const backendUrl = settings.backendUrl || 'https://udemy-extension.onrender.com';
+        // Get backend URL from settings (with fallback if chrome.storage is unavailable)
+        let backendUrl = 'https://udemy-extension.onrender.com'; // Default to Render server
+
+        try {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                const settings = await chrome.storage.local.get(['backendUrl']);
+                backendUrl = settings.backendUrl || backendUrl;
+            }
+        } catch (e) {
+            console.log('[Udemy AI] Chrome storage not available, using default URL');
+        }
 
         console.log('[Udemy AI] Calling backend:', backendUrl);
+
+        // Build request body - only include force_refresh if true (backward compatibility)
+        const requestBody = {
+            transcript: transcript,
+            lecture_title: document.title
+        };
+        if (forceRefresh) {
+            requestBody.force_refresh = true;
+        }
 
         const response = await fetch(`${backendUrl}/api/process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                transcript: transcript,
-                lecture_title: document.title,
-                force_refresh: forceRefresh
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -308,6 +485,52 @@ That covers the basics of functions and lists in Python. In the next lecture, we
     }
 }
 
+// Format markdown-style summary into beautiful HTML
+function formatMarkdownSummary(text) {
+    // Safety check for undefined/null text
+    if (!text || typeof text !== 'string') {
+        return '<p style="color: #d32f2f; font-weight: 600;">⚠️ Error: Summary is empty or invalid</p>';
+    }
+
+    let html = text;
+
+    // Convert # heading to h1 with styling
+    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size: 2.25rem; font-weight: 700; color: #1c1d1f; margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 3px solid #a435f0;">$1</h1>');
+
+    // Convert ## heading to h2 with styling
+    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size: 1.5rem; font-weight: 700; color: #2d2f31; margin: 1.5rem 0 1rem 0; padding-left: 0.75rem; border-left: 4px solid #ff9800;">$1</h2>');
+
+    // Convert ### heading to h3 with styling  
+    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size: 1.25rem; font-weight: 600; color: #3e4143; margin: 1.25rem 0 0.75rem 0;">$1</h3>');
+
+    // Convert **bold** to strong
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: 700; color: #1c1d1f;">$1</strong>');
+
+    // Convert *italic* to em
+    html = html.replace(/\*(.+?)\*/g, '<em style="font-style: italic; color: #5624d0;">$1</em>');
+
+    // Convert bullet points (*, -, •) to styled list items
+    html = html.replace(/^[\*\-•] (.+)$/gm, '<li style="margin: 0.5rem 0; color: #2d2f31; line-height: 1.6;">$1</li>');
+
+    // Wrap consecutive list items in ul
+    html = html.replace(/(<li[^>]*>.*<\/li>\s*)+/gs, (match) => {
+        return '<ul style="margin: 1rem 0; padding-left: 2rem; list-style-type: disc;">' + match + '</ul>';
+    });
+
+    // Convert --- to horizontal rule
+    html = html.replace(/^---$/gm, '<hr style="border: none; border-top: 2px solid #e0e0e0; margin: 2rem 0;">');
+
+    // Convert line breaks to paragraphs
+    html = html.split('\n\n').map(para => {
+        if (para.trim() && !para.startsWith('<h') && !para.startsWith('<ul') && !para.startsWith('<hr') && !para.startsWith('<li')) {
+            return `<p style="margin: 1rem 0; line-height: 1.8; color: #2d2f31; font-size: 16px;">${para}</p>`;
+        }
+        return para;
+    }).join('\n');
+
+    return html;
+}
+
 function renderResult(data, fromCache = false) {
     const resultDiv = document.getElementById('ai-result');
 
@@ -318,12 +541,14 @@ function renderResult(data, fromCache = false) {
         </div>
     ` : '';
 
+    // Parse and format the summary with markdown-style formatting
+    const formattedSummary = formatMarkdownSummary(data.summary);
+
     resultDiv.innerHTML = `
         ${cacheIndicator}
         
-        <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px;">
-            <h3 style="margin-top: 0; color: #1c1d1f; font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem;">📝 Summary</h3>
-            <div style="line-height: 1.8; color: #2d2f31; white-space: pre-wrap; font-size: 16px;">${data.summary}</div>
+        <div style="background: #ffffff; padding: 2.5rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+            ${formattedSummary}
         </div>
         
         <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px;">
