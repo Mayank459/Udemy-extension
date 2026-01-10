@@ -19,13 +19,25 @@ class AIService:
         
         # Debug: Print if API key is loaded
         print(f"[AI Service] HF API Key loaded: {bool(self.hf_token)}")
+        print(f"[AI Service] Groq API Key loaded: {bool(self.groq_key)}")
         if self.hf_token:
             print(f"[AI Service] Key preview: {self.hf_token[:10]}...")
+        if self.groq_key:
+            print(f"[AI Service] Groq Key preview: {self.groq_key[:10]}...")
         
-        # Use Hugging Face as primary provider
-        self.provider = "huggingface"
+        # Use Groq as primary provider (HF models are deprecated/410 errors)
+        if self.groq_key:
+            self.provider = "groq"
+        elif self.hf_token:
+            self.provider = "huggingface"
+        elif self.openai_key:
+            self.provider = "openai"
+        else:
+            self.provider = None
         
-        # Hugging Face FLAN-T5 model endpoint (reliable, always available)
+        print(f"[AI Service] Using provider: {self.provider}")
+        
+        # Hugging Face model endpoint (deprecated - for fallback only)
         self.hf_model = "google/flan-t5-xxl"
         self.hf_api_url = f"https://api-inference.huggingface.co/models/{self.hf_model}"
         

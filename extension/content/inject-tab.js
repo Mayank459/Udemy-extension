@@ -260,7 +260,7 @@ function createAIPanel() {
                     Click "Generate Summary" to analyze this lecture with AI 🤖
                 </p>
                 <p style="margin-top: 0.5rem; font-size: 0.9rem;">
-                    Powered by Hugging Face (FLAN-T5-XXL)
+                    Powered by Groq AI (llama-3.3-70b-versatile)
                 </p>
             </div>
             
