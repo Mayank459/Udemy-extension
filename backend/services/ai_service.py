@@ -4,16 +4,18 @@ import httpx
 import re
 import hashlib
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Import API keys from config module (avoids os.environ reload issues)
-from .. import config
+# Load environment variables
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 class AIService:
     def __init__(self):
-        # Support multiple AI providers - use config module instead of os.environ
-        self.hf_token = config.HUGGINGFACE_API_KEY
-        self.groq_key = config.GROQ_API_KEY
-        self.openai_key = config.OPENAI_API_KEY
+        # Support multiple AI providers
+        self.hf_token = os.getenv("HUGGINGFACE_API_KEY")
+        self.groq_key = os.getenv("GROQ_API_KEY")
+        self.openai_key = os.getenv("OPENAI_API_KEY")
         
         # Debug: Print if API key is loaded
         print(f"[AI Service] HF API Key loaded: {bool(self.hf_token)}")
