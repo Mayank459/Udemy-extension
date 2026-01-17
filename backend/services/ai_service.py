@@ -119,7 +119,7 @@ Follow these rules strictly:
 
 3️⃣ For all mathematics:
    - Use proper LaTeX notation enclosed in $...$ for inline math or $$...$$ for display math
-   - Example: The derivative is $\\frac{dL}{dW}$ or $$W_{{new}} = W_{{old}} - \\alpha \\cdot \\frac{{\\partial L}}{{\\partial W_{{old}}}}$$
+   - Example: The derivative is $\\frac{{dL}}{{dW}}$ or $$W_{{new}} = W_{{old}} - \\alpha \\cdot \\frac{{\\partial L}}{{\\partial W_{{old}}}}$$
    - Explain what each symbol means clearly
    - Explain the intuition behind each equation
    - Show how formulas connect to each other
