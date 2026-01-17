@@ -255,22 +255,22 @@ Generate the complete, exam-level explanation now (DO NOT repeat the transcript)
         """Extract code blocks from transcript using regex patterns"""
         code_blocks = []
         
-        # Pattern 1: Markdown code blocks (```language ... ```)
+        # ONLY extract from markdown code blocks (```language ... ```)
+        # This prevents matching natural language that contains keywords like "let", "import", etc.
         markdown_pattern = r'```[\w]*\n(.*?)```'
         markdown_matches = re.findall(markdown_pattern, transcript, re.DOTALL)
-        code_blocks.extend([match.strip() for match in markdown_matches if match.strip()])
         
-        # Pattern 2: Common code indicators (function/class definitions)
-        # Only extract if it looks like actual code (has proper syntax)
-        code_pattern = r'(?:def|class|import|function|const|let|var)\s+[\w]+[^\n]{10,100}'
-        code_matches = re.findall(code_pattern, transcript, re.MULTILINE)
-        code_blocks.extend([match.strip() for match in code_matches if match.strip()])
+        for match in markdown_matches:
+            code = match.strip()
+            # Only keep if it's meaningful code (has multiple lines or is long enough)
+            if code and (len(code) > 50 or '\n' in code):
+                code_blocks.append(code)
         
         # Remove duplicates while preserving order
         seen = set()
         unique_blocks = []
         for block in code_blocks:
-            if block not in seen and len(block) > 10:  # Only keep meaningful code blocks
+            if block not in seen:
                 seen.add(block)
                 unique_blocks.append(block)
         
