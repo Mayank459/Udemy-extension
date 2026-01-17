@@ -98,77 +98,60 @@ class AIService:
         max_chars = 8000
         truncated = transcript[:max_chars] if len(transcript) > max_chars else transcript
         
-        prompt = f"""Create a clear, structured summary of this Udemy lecture transcript, formatted like study notes / course overview.
+        prompt = f"""You are an expert professor, research engineer, and technical instructor.
+
+I will give you a raw transcript of a technical lecture (AI / ML / DL / CS / Math / Engineering).
+
+Your task is to produce a COMPLETE, STRUCTURED, and EXAM-LEVEL explanation of the transcript.
+
+Follow these rules strictly:
+
+1️⃣ Break the explanation into clear, numbered sections.
+   - Start with the BIG PICTURE: what problem is being solved and why it matters.
+   - Then go step-by-step in the same order as the transcript.
+
+2️⃣ Explain EVERY concept deeply.
+   - Assume the reader is a beginner but wants expert-level understanding.
+   - Do NOT skip any idea, even if it seems obvious.
+
+3️⃣ For all mathematics:
+   - Rewrite every formula cleanly using proper notation.
+   - Explain what each symbol means.
+   - Explain the intuition behind each equation.
+   - Show how formulas connect to each other.
+
+4️⃣ For algorithms and processes:
+   - Explain the logic step-by-step.
+   - Clearly describe forward flow and backward flow if applicable.
+   - Mention real-world or practical meaning.
+
+5️⃣ For deep learning / ML topics:
+   - Explicitly explain forward propagation, backward propagation, gradients, and optimization if present.
+   - Explain WHY chain rule / loss / activation / optimizer is used, not just HOW.
+
+6️⃣ Provide at least one clean, minimal code example (Python / NumPy / PyTorch-style) 
+   that demonstrates the core idea practically.
+
+7️⃣ Highlight important takeaways, assumptions, and common mistakes.
+
+8️⃣ End with a CLEAR, BULLET-POINT SUMMARY that a student could revise before an exam.
+
+IMPORTANT CONSTRAINTS:
+- Do NOT summarize early.
+- Do NOT shorten explanations.
+- Do NOT use vague phrases like "this is obvious".
+- Maintain academic clarity, depth, and correctness.
+
+---
 
 Lecture Title: {title}
 
 Transcript:
 {truncated}
 
-IMPORTANT: Format the summary EXACTLY like this example structure using markdown:
-
 ---
 
-# 📘 [Topic Name] – Lecture Summary
-
-## 🔹 Topic Overview
-
-[Brief overview paragraph explaining what this lecture covers and its purpose]
-
----
-
-## 🔹 [Main Section 1]
-
-* Point 1 with **bold emphasis** on key terms
-* Point 2 with important details
-* Point 3 with specifics
-
-### [Subsection if needed]
-
-* Sub-point 1
-* Sub-point 2
-
----
-
-## 🔹 [Main Section 2]
-
-[Content organized by topic with bullets, numbered lists, or paragraphs]
-
-### 1. [Subtopic Name]
-
-* Explanation with **bold** for emphasis
-* Use *italic* for technical terms or examples
-
-### 2. [Next Subtopic]
-
-* Detail 1
-* Detail 2
-
----
-
-[Repeat for each major topic covered in the lecture]
-
----
-
-## 🎯 Key Takeaways
-
-* Main takeaway 1 with **bold emphasis**
-* Main takeaway 2
-* Main takeaway 3
-
----
-
-REQUIREMENTS:
-- Use emojis (📘, 🔹, 🎯, 💡, etc.) to make sections visually appealing
-- Use **bold** for important terms and concepts
-- Use *italic* for examples or technical terms
-- Use horizontal rules (---) to separate major sections
-- Organize with clear hierarchy: # for title, ## for sections, ### for subsections
-- Include practical takeaways at the end
-- Be comprehensive but concise
-- Focus on educational value
-
-Generate the summary now:"""
+Generate the complete, exam-level explanation now:"""
 
         if self.provider == "huggingface":
             return await self._call_huggingface(prompt)
