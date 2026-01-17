@@ -106,7 +106,10 @@ Your task is to produce a COMPLETE, STRUCTURED, and EXAM-LEVEL explanation of th
 
 Follow these rules strictly:
 
-1️⃣ Break the explanation into clear, numbered sections.
+1️⃣ Break the explanation into clear, numbered sections with proper markdown headings.
+   - Start with # for the main title
+   - Use ## for major sections (1., 2., 3., etc.)
+   - Use ### for subsections
    - Start with the BIG PICTURE: what problem is being solved and why it matters.
    - Then go step-by-step in the same order as the transcript.
 
@@ -115,32 +118,38 @@ Follow these rules strictly:
    - Do NOT skip any idea, even if it seems obvious.
 
 3️⃣ For all mathematics:
-   - Rewrite every formula cleanly using proper notation.
-   - Explain what each symbol means.
-   - Explain the intuition behind each equation.
-   - Show how formulas connect to each other.
+   - Use proper LaTeX notation enclosed in $...$ for inline math or $$...$$ for display math
+   - Example: The derivative is $\\frac{dL}{dW}$ or $$W_{{new}} = W_{{old}} - \\alpha \\cdot \\frac{{\\partial L}}{{\\partial W_{{old}}}}$$
+   - Explain what each symbol means clearly
+   - Explain the intuition behind each equation
+   - Show how formulas connect to each other
 
 4️⃣ For algorithms and processes:
-   - Explain the logic step-by-step.
-   - Clearly describe forward flow and backward flow if applicable.
-   - Mention real-world or practical meaning.
+   - Explain the logic step-by-step
+   - Clearly describe forward flow and backward flow if applicable
+   - Mention real-world or practical meaning
 
 5️⃣ For deep learning / ML topics:
-   - Explicitly explain forward propagation, backward propagation, gradients, and optimization if present.
-   - Explain WHY chain rule / loss / activation / optimizer is used, not just HOW.
+   - Explicitly explain forward propagation, backward propagation, gradients, and optimization if present
+   - Explain WHY chain rule / loss / activation / optimizer is used, not just HOW
 
 6️⃣ Provide at least one clean, minimal code example (Python / NumPy / PyTorch-style) 
-   that demonstrates the core idea practically.
+   - Use proper markdown code blocks with ```python
+   - Demonstrate the core idea practically
 
-7️⃣ Highlight important takeaways, assumptions, and common mistakes.
+7️⃣ Highlight important takeaways, assumptions, and common mistakes in a dedicated section.
 
-8️⃣ End with a CLEAR, BULLET-POINT SUMMARY that a student could revise before an exam.
+8️⃣ End with a ## Summary section with CLEAR BULLET POINTS that a student could revise before an exam.
 
-IMPORTANT CONSTRAINTS:
-- Do NOT summarize early.
-- Do NOT shorten explanations.
-- Do NOT use vague phrases like "this is obvious".
-- Maintain academic clarity, depth, and correctness.
+FORMATTING REQUIREMENTS:
+- Use proper markdown headings (# ## ###)
+- Use **bold** for key terms
+- Use *italics* for emphasis
+- Use proper LaTeX math notation
+- Use code blocks with language specification
+- Use bullet points and numbered lists appropriately
+- DO NOT include the original transcript in your response
+- DO NOT use escaped characters like \\( or \\[ - use $ and $$ instead
 
 ---
 
@@ -151,7 +160,7 @@ Transcript:
 
 ---
 
-Generate the complete, exam-level explanation now:"""
+Generate the complete, exam-level explanation now (DO NOT repeat the transcript):"""
 
         if self.provider == "huggingface":
             return await self._call_huggingface(prompt)
