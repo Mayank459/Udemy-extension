@@ -27,11 +27,17 @@
         "*://*.udemy.com/lecture/*"
       ],
       "js": [
+        "libs/marked/marked.min.js",
+        "libs/katex/katex.min.js",
+        "libs/katex/auto-render.min.js",
+        "libs/prism/prism.js",
         "utils/cache-utils.js",
         "content/inject-tab.js",
         "content/caption-extractor.js"
       ],
       "css": [
+        "libs/katex/katex.min.css",
+        "libs/prism/prism.css",
         "styles/inject.css"
       ],
       "run_at": "document_idle"

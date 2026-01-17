@@ -139,27 +139,37 @@ function injectTab(scrollPort) {
     scrollItem.appendChild(navButtonContainer);
 
     // Add click handler
-    button.addEventListener('click', async () => {
-        console.log('[Udemy AI] AI Overview tab clicked!');
+    button.addEventListener('click', async (e) => {
+        console.log('[Udemy AI] ========== AI Overview tab clicked! ==========');
+        e.stopPropagation(); // Prevent Udemy from handling it
 
-        // Create panel on first click if it doesn't exist
-        if (!document.getElementById('ai-overview-panel')) {
-            console.log('[Udemy AI] Panel does not exist, creating it now...');
-            createAIPanel();
-        }
+        // Force the tab to be selected
+        button.setAttribute('aria-selected', 'true');
+        button.classList.add('ud-nav-button-active');
+    });
 
-        showAIPanel();
-
-        // Auto-generate summary if not already generated
-        const resultDiv = document.getElementById('ai-result');
-        if (resultDiv && resultDiv.style.display === 'none') {
-            console.log('[Udemy AI] Auto-generating summary...');
-            // Wait a bit for panel to be visible
-            setTimeout(() => {
-                triggerGeneration();
-            }, 100);
+    // Also use MutationObserver to detect when tab becomes selected
+    // (in case Udemy's React overrides our click handler)
+    let selectionTimeout = null;
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'aria-selected') {
+                const isSelected = button.getAttribute('aria-selected') === 'true';
+                if (isSelected) {
+                    // Debounce to prevent multiple rapid calls
+                    clearTimeout(selectionTimeout);
+                    selectionTimeout = setTimeout(() => {
+                        console.log('[Udemy AI] ========== AI Overview tab SELECTED (via mutation) ==========');
+                        handleAITabSelection();
+                    }, 50);
+                }
+            }
         }
     });
+
+    observer.observe(button, { attributes: true, attributeFilter: ['aria-selected'] });
+
+    console.log('[Udemy AI] Added MutationObserver to AI Overview tab');
 
     // Append to scroll port
     scrollPort.appendChild(scrollItem);
@@ -167,6 +177,47 @@ function injectTab(scrollPort) {
     console.log('[Udemy AI] Tab injected successfully!');
     console.log('[Udemy AI] Tab element:', button);
     console.log('[Udemy AI] Tab visible?', button.offsetWidth > 0 && button.offsetHeight > 0);
+}
+
+// Handle AI Overview tab selection (separated from click handler)
+async function handleAITabSelection() {
+    console.log('[Udemy AI] handleAITabSelection called');
+
+    // Always create panel fresh or ensure it exists
+    let aiPanel = document.getElementById('ai-overview-panel');
+    if (!aiPanel) {
+        console.log('[Udemy AI] Panel does not exist, creating it now...');
+        createAIPanel();
+        aiPanel = document.getElementById('ai-overview-panel');
+    }
+
+    if (!aiPanel) {
+        console.error('[Udemy AI] CRITICAL: Panel still doesn\'t exist after creation!');
+        return;
+    }
+
+    // If panel is already visible, don't do anything (prevents loop)
+    if (aiPanel.style.display === 'block') {
+        console.log('[Udemy AI] Panel already visible, skipping...');
+        return;
+    }
+
+    console.log('[Udemy AI] Panel exists, showing it...');
+    showAIPanel();
+
+    console.log('[Udemy AI] Panel display:', aiPanel.style.display);
+    console.log('[Udemy AI] Panel offsetHeight:', aiPanel.offsetHeight);
+    console.log('[Udemy AI] Panel offsetWidth:', aiPanel.offsetWidth);
+
+    // Auto-generate summary if not already generated
+    const resultDiv = document.getElementById('ai-result');
+    if (resultDiv && resultDiv.style.display === 'none') {
+        console.log('[Udemy AI] Auto-generating summary...');
+        // Wait a bit for panel to be visible
+        setTimeout(() => {
+            triggerGeneration();
+        }, 100);
+    }
 }
 
 function createAIPanel() {
@@ -391,7 +442,16 @@ function setupOtherTabClickHandlers() {
 }
 
 // Start generation in background (silently)
+let hasBackgroundGenerated = false;
+
 function startBackgroundGeneration() {
+    // Only run background generation once per page
+    if (hasBackgroundGenerated) {
+        console.log('[Udemy AI] Background generation already ran, skipping...');
+        return;
+    }
+
+    hasBackgroundGenerated = true;
     console.log('[Udemy AI] Starting background generation...');
 
     // Create panel if it doesn't exist (but don't show it)
@@ -410,7 +470,18 @@ function startBackgroundGeneration() {
     }
 }
 
+// Flag to prevent repeated generation
+let isGenerating = false;
+
 async function triggerGeneration(forceRefresh = false) {
+    // Prevent concurrent generation
+    if (isGenerating && !forceRefresh) {
+        console.log('[Udemy AI] Generation already in progress, skipping...');
+        return;
+    }
+
+    isGenerating = true;
+
     const loadingDiv = document.getElementById('ai-loading');
     const resultDiv = document.getElementById('ai-result');
     const placeholderDiv = document.getElementById('ai-placeholder');
@@ -490,6 +561,7 @@ async function triggerGeneration(forceRefresh = false) {
         resultDiv.style.display = 'block';
     } finally {
         loadingDiv.style.display = 'none';
+        isGenerating = false; // Reset flag to allow future generation
     }
 }
 
@@ -535,50 +607,51 @@ That covers the basics of functions and lists in Python. In the next lecture, we
     }
 }
 
-// Format markdown-style summary into beautiful HTML
+// Format markdown-style summary into beautiful HTML with LaTeX and syntax highlighting
 function formatMarkdownSummary(text) {
     // Safety check for undefined/null text
     if (!text || typeof text !== 'string') {
         return '<p style="color: #d32f2f; font-weight: 600;">⚠️ Error: Summary is empty or invalid</p>';
     }
 
-    let html = text;
+    try {
+        // Step 1: Parse markdown to HTML using marked.js
+        const html = marked.parse(text, {
+            breaks: true,
+            gfm: true
+        });
 
-    // Convert # heading to h1 with styling
-    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size: 2.25rem; font-weight: 700; color: #1c1d1f; margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 3px solid #a435f0;">$1</h1>');
+        // Step 2: Create container
+        const container = document.createElement('div');
+        container.innerHTML = html;
 
-    // Convert ## heading to h2 with styling
-    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size: 1.5rem; font-weight: 700; color: #2d2f31; margin: 1.5rem 0 1rem 0; padding-left: 0.75rem; border-left: 4px solid #ff9800;">$1</h2>');
+        // Step 3: Apply syntax highlighting to code blocks
+        container.querySelectorAll('pre code').forEach((block) => {
+            // Add Python class by default if no language specified
+            if (!block.className) {
+                block.className = 'language-python';
+            }
+            Prism.highlightElement(block);
+        });
 
-    // Convert ### heading to h3 with styling  
-    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size: 1.25rem; font-weight: 600; color: #3e4143; margin: 1.25rem 0 0.75rem 0;">$1</h3>');
-
-    // Convert **bold** to strong
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: 700; color: #1c1d1f;">$1</strong>');
-
-    // Convert *italic* to em
-    html = html.replace(/\*(.+?)\*/g, '<em style="font-style: italic; color: #5624d0;">$1</em>');
-
-    // Convert bullet points (*, -, •) to styled list items
-    html = html.replace(/^[\*\-•] (.+)$/gm, '<li style="margin: 0.5rem 0; color: #2d2f31; line-height: 1.6;">$1</li>');
-
-    // Wrap consecutive list items in ul
-    html = html.replace(/(<li[^>]*>.*<\/li>\s*)+/gs, (match) => {
-        return '<ul style="margin: 1rem 0; padding-left: 2rem; list-style-type: disc;">' + match + '</ul>';
-    });
-
-    // Convert --- to horizontal rule
-    html = html.replace(/^---$/gm, '<hr style="border: none; border-top: 2px solid #e0e0e0; margin: 2rem 0;">');
-
-    // Convert line breaks to paragraphs
-    html = html.split('\n\n').map(para => {
-        if (para.trim() && !para.startsWith('<h') && !para.startsWith('<ul') && !para.startsWith('<hr') && !para.startsWith('<li')) {
-            return `<p style="margin: 1rem 0; line-height: 1.8; color: #2d2f31; font-size: 16px;">${para}</p>`;
+        // Step 4: Render LaTeX math using KaTeX
+        if (typeof renderMathInElement !== 'undefined') {
+            renderMathInElement(container, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '$', right: '$', display: false }
+                ],
+                throwOnError: false,
+                errorColor: '#cc0000'
+            });
         }
-        return para;
-    }).join('\n');
 
-    return html;
+        return container.innerHTML;
+    } catch (error) {
+        console.error('[Udemy AI] Error rendering markdown:', error);
+        // Fallback to plain text if rendering fails
+        return `<p>${escapeHtml(text)}</p>`;
+    }
 }
 
 function renderResult(data, fromCache = false) {
