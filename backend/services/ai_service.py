@@ -222,7 +222,7 @@ Generate the complete, exam-level explanation now (DO NOT repeat the transcript)
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.5,
-            "max_tokens": 1024,
+            "max_tokens": 4096,  # Increased from 1024 for comprehensive explanations
             "top_p": 1,
             "stream": False
         }
@@ -255,29 +255,26 @@ Generate the complete, exam-level explanation now (DO NOT repeat the transcript)
         """Extract code blocks from transcript using regex patterns"""
         code_blocks = []
         
-        # Pattern 1: Look for common code indicators
-        patterns = [
-            r'```[\w]*\n(.*?)```',  # Markdown code blocks
-            r'(?:def|class|import|function|const|let|var)\s+[\w]+.*?(?:\n|$)',  # Function/class definitions
-        ]
+        # Pattern 1: Markdown code blocks (```language ... ```)
+        markdown_pattern = r'```[\w]*\n(.*?)```'
+        markdown_matches = re.findall(markdown_pattern, transcript, re.DOTALL)
+        code_blocks.extend([match.strip() for match in markdown_matches if match.strip()])
         
-        for pattern in patterns:
-            matches = re.findall(pattern, transcript, re.DOTALL | re.MULTILINE)
-            code_blocks.extend(matches)
+        # Pattern 2: Common code indicators (function/class definitions)
+        # Only extract if it looks like actual code (has proper syntax)
+        code_pattern = r'(?:def|class|import|function|const|let|var)\s+[\w]+[^\n]{10,100}'
+        code_matches = re.findall(code_pattern, transcript, re.MULTILINE)
+        code_blocks.extend([match.strip() for match in code_matches if match.strip()])
         
-        # Also use AI to extract code if available
-        if self.hf_token and len(code_blocks) < 3:
-            code_prompt = f"""Extract all code snippets from this transcript. Return only the code, one per line:
-
-{transcript[:3000]}
-
-Code snippets:"""
-            
-            ai_code = await self._call_huggingface(code_prompt)
-            if ai_code and not ai_code.startswith("⚠️"):
-                code_blocks.append(ai_code)
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_blocks = []
+        for block in code_blocks:
+            if block not in seen and len(block) > 10:  # Only keep meaningful code blocks
+                seen.add(block)
+                unique_blocks.append(block)
         
-        return code_blocks[:10] if code_blocks else ["# No code found in transcript"]
+        return unique_blocks[:10] if unique_blocks else []
 
     def _extract_key_concepts(self, summary: str) -> List[str]:
         """Extract key concepts from summary"""
