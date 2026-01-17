@@ -625,7 +625,20 @@ function formatMarkdownSummary(text) {
         const container = document.createElement('div');
         container.innerHTML = html;
 
-        // Step 3: Apply syntax highlighting to code blocks
+        // Step 3: Style headings for better visual hierarchy
+        container.querySelectorAll('h1').forEach((heading) => {
+            heading.style.cssText = 'font-size: 2.8rem; font-weight: 800; color: #1c1d1f; margin: 2rem 0 1.5rem 0; padding-bottom: 0.75rem; border-bottom: 3px solid #a435f0; line-height: 1.2;';
+        });
+
+        container.querySelectorAll('h2').forEach((heading) => {
+            heading.style.cssText = 'font-size: 2.3rem; font-weight: 800; color: #2d2f31; margin: 1.75rem 0 1.25rem 0; padding-left: 1rem; border-left: 5px solid #ff9800; line-height: 1.3;';
+        });
+
+        container.querySelectorAll('h3').forEach((heading) => {
+            heading.style.cssText = 'font-size: 1.8rem; font-weight: 800; color: #3e4143; margin: 1.5rem 0 1rem 0; line-height: 1.4;';
+        });
+
+        // Step 4: Apply syntax highlighting to code blocks
         container.querySelectorAll('pre code').forEach((block) => {
             // Add Python class by default if no language specified
             if (!block.className) {
@@ -634,7 +647,7 @@ function formatMarkdownSummary(text) {
             Prism.highlightElement(block);
         });
 
-        // Step 4: Render LaTeX math using KaTeX
+        // Step 5: Render LaTeX math using KaTeX
         if (typeof renderMathInElement !== 'undefined') {
             renderMathInElement(container, {
                 delimiters: [
