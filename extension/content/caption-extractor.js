@@ -61,6 +61,10 @@ async function extractTranscriptFromUdemy() {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const transcript = extractTranscriptText();
+
+    // Close the transcript panel to restore Course content view
+    await closeTranscriptPanel();
+
     return transcript;
 }
 
@@ -82,6 +86,29 @@ async function ensureTranscriptPanelOpen() {
             console.log('[Udemy AI] Opening transcript panel...');
             button.click();
             await new Promise(resolve => setTimeout(resolve, 1000));
+            break;
+        }
+    }
+}
+
+// Helper function to close transcript panel after extraction
+async function closeTranscriptPanel() {
+    console.log('[Udemy AI] Closing transcript panel...');
+
+    // Look for transcript button/toggle
+    const transcriptButtons = [
+        'button[data-purpose="transcript-toggle"]',
+        'button[aria-label*="Transcript"]',
+        'button[aria-label*="transcript"]',
+        '[class*="transcript-toggle"]'
+    ];
+
+    for (const selector of transcriptButtons) {
+        const button = document.querySelector(selector);
+        if (button && button.getAttribute('aria-expanded') === 'true') {
+            console.log('[Udemy AI] Closing transcript panel to restore Course content...');
+            button.click();
+            await new Promise(resolve => setTimeout(resolve, 500));
             break;
         }
     }
