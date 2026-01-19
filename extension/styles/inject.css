@@ -57,3 +57,52 @@
     padding: 10px;
     border-radius: 4px;
 }
+
+/* Font Size Control Buttons */
+#font-decrease-btn:hover,
+#font-increase-btn:hover {
+    background: #e8eaed !important;
+    transform: scale(1.05);
+}
+
+#font-decrease-btn:active,
+#font-increase-btn:active {
+    transform: scale(0.95);
+}
+
+/* KaTeX Display Math Centering - High Specificity */
+#ai-result .katex-display,
+#ai-content .katex-display,
+.katex-display {
+    text-align: center !important;
+    margin: 1.5em auto !important;
+    padding: 1em 0 !important;
+    display: block !important;
+    width: 100% !important;
+}
+
+#ai-result .katex-display>.katex,
+#ai-content .katex-display>.katex,
+.katex-display>.katex {
+    text-align: center !important;
+    display: inline-block !important;
+    margin: 0 auto !important;
+}
+
+/* Improve LaTeX inline math spacing */
+.katex {
+    font-size: 1.1em !important;
+}
+
+/* Make display math more prominent */
+#ai-result .katex-display .katex,
+#ai-content .katex-display .katex,
+.katex-display .katex {
+    font-size: 1.3em !important;
+}
+
+/* Ensure paragraph containing display math is centered */
+#ai-result p:has(.katex-display),
+#ai-content p:has(.katex-display) {
+    text-align: center !important;
+}

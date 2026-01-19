@@ -4,12 +4,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
 env/
+venv/
 ENV/
+.venv
 
-# Environment variables (IMPORTANT - contains API keys!)
+# Environment variables
 .env
+.env.local
 *.env
 
 # IDE
@@ -17,11 +19,23 @@ ENV/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Extension build
-extension/dist/
-node_modules/
+# Extension
+extension/web-accessible-resources/
+
+# Logs
+*.log
+
+# Test files
+test_*.py
+fix_*.py
+update_*.py
+
+# Temporary files
+*.tmp
+*.bak

@@ -64,6 +64,46 @@ function getCachedSummary(url, transcript) {
 }
 
 /**
+ * Get cached summary by URL only (without transcript)
+ * This allows checking cache before extracting transcript
+ */
+function getCachedSummaryByUrl(url) {
+    try {
+        const urlHash = simpleHash(url);
+        const keys = Object.keys(localStorage);
+
+        // Find any cache entry that matches the URL hash
+        for (const key of keys) {
+            if (key.startsWith(CACHE_PREFIX) && key.includes(urlHash)) {
+                const cached = localStorage.getItem(key);
+                if (!cached) continue;
+
+                const cacheData = JSON.parse(cached);
+
+                // Check if cache is still valid
+                if (!isCacheValid(cacheData.timestamp)) {
+                    console.log('[Cache] Miss - cache expired for URL');
+                    localStorage.removeItem(key);
+                    continue;
+                }
+
+                // Verify the URL matches exactly
+                if (cacheData.url === url) {
+                    console.log('[Cache] Hit - found cached data for URL (no transcript needed)');
+                    return cacheData.data;
+                }
+            }
+        }
+
+        console.log('[Cache] Miss - no cached data for URL');
+        return null;
+    } catch (error) {
+        console.error('[Cache] Error reading cache by URL:', error);
+        return null;
+    }
+}
+
+/**
  * Store summary in cache
  */
 function setCachedSummary(url, transcript, data) {
@@ -138,6 +178,7 @@ function getCacheStats() {
 // Export functions for use in inject-tab.js
 window.UdemyAICache = {
     getCachedSummary,
+    getCachedSummaryByUrl,
     setCachedSummary,
     clearAllCache,
     getCacheStats

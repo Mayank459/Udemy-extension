@@ -287,16 +287,42 @@ function createAIPanel() {
     aiPanel.innerHTML = `
         <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
             <h2 style="margin: 0; font-size: 1.5rem; color: #1c1d1f;">✨ AI Smart Overview</h2>
-            <button id="ai-generate-btn" style="
-                background: #a435f0;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: 700;
-                font-size: 1rem;
-            ">Generate Summary</button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div style="display: flex; gap: 0.25rem; background: #f7f9fa; border-radius: 4px; padding: 0.25rem;">
+                    <button id="font-decrease-btn" style="
+                        background: white;
+                        color: #1c1d1f;
+                        border: 1px solid #d1d7dc;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        transition: all 0.2s;
+                    " title="Decrease font size">A-</button>
+                    <button id="font-increase-btn" style="
+                        background: white;
+                        color: #1c1d1f;
+                        border: 1px solid #d1d7dc;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        transition: all 0.2s;
+                    " title="Increase font size">A+</button>
+                </div>
+                <button id="ai-generate-btn" style="
+                    background: #a435f0;
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-weight: 700;
+                    font-size: 1rem;
+                ">Generate Summary</button>
+            </div>
         </div>
         
         <div id="ai-content">
@@ -336,6 +362,13 @@ function createAIPanel() {
 
     // Bind generate button
     document.getElementById('ai-generate-btn').addEventListener('click', triggerGeneration);
+
+    // Bind font size buttons
+    document.getElementById('font-decrease-btn').addEventListener('click', decreaseFontSize);
+    document.getElementById('font-increase-btn').addEventListener('click', increaseFontSize);
+
+    // Initialize font size from localStorage
+    initializeFontSize();
 }
 
 function showAIPanel() {
@@ -491,17 +524,35 @@ async function triggerGeneration(forceRefresh = false) {
     resultDiv.style.display = 'none';
 
     try {
+        // Check URL-based cache first (before extracting transcript)
+        if (!forceRefresh && window.UdemyAICache) {
+            const cachedByUrl = window.UdemyAICache.getCachedSummaryByUrl(window.location.href);
+            if (cachedByUrl) {
+                console.log('[Udemy AI] ⚡ Using cached summary (no transcript extraction needed)');
+                renderResult(cachedByUrl, true); // true = from cache
+                return;
+            }
+        }
+
         // Get transcript from caption extractor
         const transcript = await getTranscript();
 
-        if (!transcript) {
-            throw new Error('No transcript available. This is a demo - real caption extraction needs to be implemented.');
+        console.log('[Udemy AI] Transcript received:', {
+            type: typeof transcript,
+            length: transcript?.length || 0,
+            isNull: transcript === null,
+            isUndefined: transcript === undefined
+        });
+
+        if (!transcript || typeof transcript !== 'string' || transcript.trim().length === 0) {
+            throw new Error('No transcript available. Please make sure the video has captions/subtitles enabled.');
         }
 
-        // Check cache first (unless force refresh)
+        // Check cache with transcript hash (double-check in case transcript changed)
         if (!forceRefresh && window.UdemyAICache) {
             const cached = window.UdemyAICache.getCachedSummary(window.location.href, transcript);
             if (cached) {
+                console.log('[Udemy AI] ⚡ Using cached summary (transcript-verified)');
                 renderResult(cached, true); // true = from cache
                 return;
             }
@@ -608,24 +659,72 @@ That covers the basics of functions and lists in Python. In the next lecture, we
 }
 
 // Format markdown-style summary into beautiful HTML with LaTeX and syntax highlighting
-function formatMarkdownSummary(text) {
+async function formatMarkdownSummary(text) {
     // Safety check for undefined/null text
     if (!text || typeof text !== 'string') {
         return '<p style="color: #d32f2f; font-weight: 600;">⚠️ Error: Summary is empty or invalid</p>';
     }
 
     try {
-        // Step 1: Parse markdown to HTML using marked.js
-        const html = marked.parse(text, {
+        console.log('[Udemy AI] formatMarkdownSummary input length:', text.length);
+        console.log('[Udemy AI] First 200 chars:', text.substring(0, 200));
+
+        // Step 1: Extract and protect LaTeX blocks before markdown parsing
+        const latexBlocks = [];
+        let textWithPlaceholders = text;
+
+        // Extract display math ($$...$$)
+        textWithPlaceholders = textWithPlaceholders.replace(/\$\$([\s\S]+?)\$\$/g, (match, content) => {
+            const placeholder = `___LATEX_BLOCK_${latexBlocks.length}___`;
+            latexBlocks.push({ type: 'display', content: match });
+            return placeholder;
+        });
+
+        // Extract inline math ($...$) - but not $$
+        textWithPlaceholders = textWithPlaceholders.replace(/\$([^\$\n]+?)\$/g, (match, content) => {
+            const placeholder = `___LATEX_INLINE_${latexBlocks.length}___`;
+            latexBlocks.push({ type: 'inline', content: match });
+            return placeholder;
+        });
+
+        console.log('[Udemy AI] Extracted', latexBlocks.length, 'LaTeX blocks');
+
+        // Step 2: Parse markdown to HTML using marked.js
+        const html = marked.parse(textWithPlaceholders, {
             breaks: true,
             gfm: true
         });
 
-        // Step 2: Create container
+        // Step 3: Create container
         const container = document.createElement('div');
         container.innerHTML = html;
 
-        // Step 3: Style headings for better visual hierarchy
+        // Step 4: Restore LaTeX blocks
+        console.log('[Udemy AI] Restoring', latexBlocks.length, 'LaTeX blocks...');
+        let finalHTML = container.innerHTML;
+
+        latexBlocks.forEach((block, index) => {
+            const displayPlaceholder = `___LATEX_BLOCK_${index}___`;
+            const inlinePlaceholder = `___LATEX_INLINE_${index}___`;
+
+            // Replace both normal and HTML-escaped versions
+            const displayRegex = new RegExp(displayPlaceholder.replace(/_/g, '_?'), 'g');
+            const inlineRegex = new RegExp(inlinePlaceholder.replace(/_/g, '_?'), 'g');
+
+            const beforeLength = finalHTML.length;
+            finalHTML = finalHTML.replace(displayRegex, block.content);
+            finalHTML = finalHTML.replace(inlineRegex, block.content);
+            const afterLength = finalHTML.length;
+
+            if (beforeLength !== afterLength) {
+                console.log(`[Udemy AI] Restored LaTeX block ${index}:`, block.content.substring(0, 50) + '...');
+            } else {
+                console.warn(`[Udemy AI] Failed to restore LaTeX block ${index}, placeholder not found`);
+            }
+        });
+        container.innerHTML = finalHTML;
+
+        // Step 5: Style headings for better visual hierarchy
         container.querySelectorAll('h1').forEach((heading) => {
             heading.style.cssText = 'font-size: 2.8rem; font-weight: 800; color: #1c1d1f; margin: 2rem 0 1.5rem 0; padding-bottom: 0.75rem; border-bottom: 3px solid #a435f0; line-height: 1.2;';
         });
@@ -647,27 +746,50 @@ function formatMarkdownSummary(text) {
             Prism.highlightElement(block);
         });
 
-        // Step 5: Render LaTeX math using KaTeX
+        // Step 5: Render LaTeX math using KaTeX (loaded from manifest)
+        // Load KaTeX from CDN if not already loaded
+        // try {
+        //     await ensureKaTeXLoaded();
+        // } catch (error) {
+        //     console.warn('[Udemy AI] Failed to load KaTeX, math rendering will be skipped:', error);
+        // }
+
+        console.log('[Udemy AI] Checking KaTeX availability:', {
+            renderMathInElement: typeof renderMathInElement,
+            katex: typeof katex
+        });
+
         if (typeof renderMathInElement !== 'undefined') {
-            renderMathInElement(container, {
-                delimiters: [
-                    { left: '$$', right: '$$', display: true },
-                    { left: '$', right: '$', display: false }
-                ],
-                throwOnError: false,
-                errorColor: '#cc0000'
-            });
+            try {
+                renderMathInElement(container, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '\\(', right: '\\)', display: false }
+                    ],
+                    throwOnError: false,
+                    errorColor: '#cc0000',
+                    trust: true
+                });
+                console.log('[Udemy AI] ✅ KaTeX rendering completed');
+            } catch (error) {
+                console.error('[Udemy AI] KaTeX rendering error:', error);
+            }
+        } else {
+            console.warn('[Udemy AI] ⚠️ KaTeX renderMathInElement not available - check manifest.json');
         }
 
         return container.innerHTML;
     } catch (error) {
         console.error('[Udemy AI] Error rendering markdown:', error);
+        console.error('[Udemy AI] Error stack:', error.stack);
         // Fallback to plain text if rendering fails
-        return `<p>${escapeHtml(text)}</p>`;
+        return `<p style="color: #d32f2f;">${escapeHtml(text)}</p>`;
     }
 }
 
-function renderResult(data, fromCache = false) {
+async function renderResult(data, fromCache = false) {
     const resultDiv = document.getElementById('ai-result');
 
     const cacheIndicator = fromCache ? `
@@ -678,16 +800,16 @@ function renderResult(data, fromCache = false) {
     ` : '';
 
     // Parse and format the summary with markdown-style formatting
-    const formattedSummary = formatMarkdownSummary(data.summary);
+    const formattedSummary = await formatMarkdownSummary(data.summary);
 
     resultDiv.innerHTML = `
         ${cacheIndicator}
         
-        <div style="background: #ffffff; padding: 2.5rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+        <div style="background: #ffffff; padding: 2.5rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
             ${formattedSummary}
         </div>
         
-        <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; font-size: 16px;">
+        <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
             <h3 style="margin-top: 0; color: #1c1d1f; font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem;">💻 Code Snippets</h3>
             ${data.code_blocks.length > 0 ? data.code_blocks.map(code => `
                 <pre style="
@@ -700,14 +822,15 @@ function renderResult(data, fromCache = false) {
                     font-size: 15px;
                     line-height: 1.6;
                 "><code>${escapeHtml(code)}</code></pre>
-            `).join('') : '<p style="color: #6a6f73; font-style: italic; font-size: 16px;">No code snippets found in this lecture.</p>'}
+            `).join('') : '<p style="color: #6a6f73; font-style: italic;">No code snippets found in this lecture.</p>'}
         </div>
         
-        <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px; font-size: 16px;">
+        <div style="background: #f7f9fa; padding: 2rem; border-radius: 8px;">
             <h3 style="margin-top: 0; color: #1c1d1f; font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem;">🎯 Key Concepts</h3>
             <ul style="margin: 0; padding-left: 2rem; line-height: 1.8;">
-                ${data.key_concepts.map(concept => `<li style="margin: 0.75rem 0; color: #2d2f31; font-size: 16px;">${concept}</li>`).join('')}
+                ${data.key_concepts.map(concept => `<li style="margin: 0.75rem 0; color: #2d2f31;">${concept}</li>`).join('')}
             </ul>
+        </div>
         
         
         <!-- Action Buttons -->
@@ -757,8 +880,15 @@ function renderResult(data, fromCache = false) {
 
     resultDiv.style.display = 'block';
 
+    // Set base font size (16px) so percentage scaling works properly
+    resultDiv.style.fontSize = '16px';
+
     // Store data globally for export functions
     window.currentSummaryData = data;
+
+    // Apply saved font size
+    const savedScale = getCurrentFontScale();
+    applyFontSize(savedScale, false); // false = don't save (already saved)
 
     // Bind export button events
     setTimeout(() => {
@@ -929,4 +1059,163 @@ function loadScript(src) {
         script.onerror = reject;
         document.head.appendChild(script);
     });
+}
+
+function loadStylesheet(href) {
+    return new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = reject;
+        document.head.appendChild(link);
+    });
+}
+
+// Load KaTeX from CDN if not already loaded
+let katexLoadPromise = null;
+async function ensureKaTeXLoaded() {
+    // If already loaded, return immediately
+    if (typeof katex !== 'undefined' && typeof renderMathInElement !== 'undefined') {
+        console.log('[Udemy AI] KaTeX already loaded');
+        return;
+    }
+
+    // If currently loading, wait for that promise
+    if (katexLoadPromise) {
+        console.log('[Udemy AI] KaTeX loading in progress, waiting...');
+        return katexLoadPromise;
+    }
+
+    // Start loading
+    console.log('[Udemy AI] Loading KaTeX from CDN...');
+    katexLoadPromise = (async () => {
+        try {
+            // Load KaTeX CSS
+            console.log('[Udemy AI] Loading KaTeX CSS...');
+            await loadStylesheet('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
+
+            // Load KaTeX JS
+            console.log('[Udemy AI] Loading KaTeX JS...');
+            await loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js');
+
+            // Load auto-render extension
+            console.log('[Udemy AI] Loading KaTeX auto-render...');
+            await loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js');
+
+            console.log('[Udemy AI] ✅ KaTeX loaded from CDN successfully');
+        } catch (error) {
+            console.error('[Udemy AI] Failed to load KaTeX from CDN:', error);
+            console.error('[Udemy AI] Error details:', error.message, error.stack);
+            throw error;
+        }
+    })();
+
+    return katexLoadPromise;
+}
+
+// Font Size Control Functions
+const FONT_SIZE_KEY = 'udemy-ai-font-scale';
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.0;
+const SCALE_STEP = 0.1;
+
+function initializeFontSize() {
+    try {
+        const savedScale = localStorage.getItem(FONT_SIZE_KEY);
+        if (savedScale) {
+            const scale = parseFloat(savedScale);
+            applyFontSize(scale, false); // false = don't save (already saved)
+        }
+    } catch (error) {
+        console.error('[Udemy AI] Error loading font size:', error);
+    }
+}
+
+function getCurrentFontScale() {
+    try {
+        const savedScale = localStorage.getItem(FONT_SIZE_KEY);
+        return savedScale ? parseFloat(savedScale) : 1.0;
+    } catch (error) {
+        return 1.0;
+    }
+}
+
+function increaseFontSize() {
+    console.log('[Udemy AI] increaseFontSize called');
+    const currentScale = getCurrentFontScale();
+    const newScale = Math.min(currentScale + SCALE_STEP, MAX_SCALE);
+    console.log(`[Udemy AI] Increasing from ${currentScale} to ${newScale}`);
+    applyFontSize(newScale);
+}
+
+function decreaseFontSize() {
+    console.log('[Udemy AI] decreaseFontSize called');
+    const currentScale = getCurrentFontScale();
+    const newScale = Math.max(currentScale - SCALE_STEP, MIN_SCALE);
+    console.log(`[Udemy AI] Decreasing from ${currentScale} to ${newScale}`);
+    applyFontSize(newScale);
+}
+
+function applyFontSize(scale, save = true) {
+    console.log(`[Udemy AI] applyFontSize called with scale: ${scale}, save: ${save}`);
+
+    const resultDiv = document.getElementById('ai-result');
+    const aiContent = document.getElementById('ai-content');
+    const aiPanel = document.getElementById('ai-overview-panel');
+
+    console.log('[Udemy AI] Elements found:', {
+        resultDiv: !!resultDiv,
+        aiContent: !!aiContent,
+        aiPanel: !!aiPanel
+    });
+
+    // Apply to all content areas
+    if (resultDiv) {
+        resultDiv.style.fontSize = `${scale * 100}%`;
+        console.log(`[Udemy AI] Applied font size to resultDiv: ${scale * 100}%`);
+    }
+
+    if (aiContent) {
+        aiContent.style.fontSize = `${scale * 100}%`;
+        console.log(`[Udemy AI] Applied font size to aiContent: ${scale * 100}%`);
+    }
+
+    // Save to localStorage
+    if (save) {
+        try {
+            localStorage.setItem(FONT_SIZE_KEY, scale.toString());
+            console.log(`[Udemy AI] Font size saved to localStorage: ${Math.round(scale * 100)}%`);
+        } catch (error) {
+            console.error('[Udemy AI] Error saving font size:', error);
+        }
+    }
+
+    // Update button states
+    updateFontSizeButtons(scale);
+}
+
+function updateFontSizeButtons(scale) {
+    const decreaseBtn = document.getElementById('font-decrease-btn');
+    const increaseBtn = document.getElementById('font-increase-btn');
+
+    if (decreaseBtn) {
+        if (scale <= MIN_SCALE) {
+            decreaseBtn.style.opacity = '0.5';
+            decreaseBtn.style.cursor = 'not-allowed';
+        } else {
+            decreaseBtn.style.opacity = '1';
+            decreaseBtn.style.cursor = 'pointer';
+        }
+    }
+
+    if (increaseBtn) {
+        if (scale >= MAX_SCALE) {
+            increaseBtn.style.opacity = '0.5';
+            increaseBtn.style.cursor = 'not-allowed';
+        } else {
+            increaseBtn.style.opacity = '1';
+            increaseBtn.style.cursor = 'pointer';
+        }
+    }
 }

@@ -130,11 +130,11 @@ function extractTranscriptText() {
         const textElements = transcriptSidebar.querySelectorAll('p, span[class*="cue"], div[class*="cue"]');
         if (textElements.length > 0) {
             const text = Array.from(textElements)
-                .map(el => el.textContent.trim())
-                .filter(t => t.length > 0 && !t.includes('Autoscroll') && !t.startsWith('Take a'))
+                .map(el => (el.textContent || '').trim())
+                .filter(t => t && t.length > 0 && !t.includes('Autoscroll') && !t.startsWith('Take a'))
                 .join(' ');
 
-            if (text.length > 50) {
+            if (text && text.length > 50) {
                 console.log(`[Udemy AI] ✅ Extracted ${text.length} characters from sidebar`);
                 return text;
             }
@@ -165,11 +165,11 @@ function extractTranscriptText() {
         if (elements.length > 0) {
             console.log(`[Udemy AI] Found ${elements.length} elements with selector: ${selector}`);
             const text = Array.from(elements)
-                .map(el => el.textContent.trim())
-                .filter(t => t.length > 0)
+                .map(el => (el.textContent || '').trim())
+                .filter(t => t && t.length > 0)
                 .join(' ');
 
-            if (text.length > 50) {
+            if (text && text.length > 50) {
                 console.log(`[Udemy AI] ✅ Extracted ${text.length} characters`);
                 return text;
             }
@@ -189,8 +189,8 @@ function extractTranscriptText() {
         const container = document.querySelector(selector);
         if (container) {
             console.log(`[Udemy AI] Found container: ${selector}`);
-            const text = container.innerText.trim();
-            if (text.length > 50) {
+            const text = (container.innerText || container.textContent || '').trim();
+            if (text && text.length > 50) {
                 console.log(`[Udemy AI] ✅ Extracted ${text.length} characters from container`);
                 return text;
             }
@@ -244,8 +244,9 @@ function extractTranscriptText() {
     }
 
     console.log(`[Udemy AI] Found ${foundTranscriptElements} transcript-related elements`);
-    console.log('[Udemy AI] ⚠️ Could not extract transcript, using sample data');
-    return null;
+    console.log('[Udemy AI] ⚠️ Could not extract real transcript, using sample data');
+    console.log('[Udemy AI] 💡 Tip: Make sure the video has captions/subtitles enabled');
+    return SAMPLE_TRANSCRIPT;
 }
 
 // Listen for requests from inject-tab.js via window.postMessage
